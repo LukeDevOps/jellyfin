@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.RealDebrid;
+namespace Jellyfin.Plugin.StreamHub;
 
 public class SearchService
 {

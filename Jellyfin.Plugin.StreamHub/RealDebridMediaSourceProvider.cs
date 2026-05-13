@@ -5,7 +5,7 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.RealDebrid;
+namespace Jellyfin.Plugin.StreamHub;
 
 public class RealDebridMediaSourceProvider : IMediaSourceProvider
 {

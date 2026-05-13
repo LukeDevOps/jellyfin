@@ -3,19 +3,21 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Jellyfin.Plugin.RealDebrid;
+namespace Jellyfin.Plugin.StreamHub;
 
 [ApiController]
 [Authorize]
-[Route("RealDebrid")]
-public class RealDebridController : BaseJellyfinApiController
+[Route("StreamHub")]
+public class StreamHubController : BaseJellyfinApiController
 {
     private readonly SearchService _searchService;
+    private readonly TraktService _traktService;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public RealDebridController(SearchService searchService, IHttpClientFactory httpClientFactory)
+    public StreamHubController(SearchService searchService, TraktService traktService, IHttpClientFactory httpClientFactory)
     {
         _searchService = searchService;
+        _traktService = traktService;
         _httpClientFactory = httpClientFactory;
     }
 
@@ -87,7 +89,61 @@ public class RealDebridController : BaseJellyfinApiController
 
         return Ok(new StreamResponse(directUrl));
     }
+
+    /// <summary>
+    /// Starts the Trakt device auth flow. Returns the code the user enters at trakt.tv/activate.
+    /// </summary>
+    [HttpPost("trakt/auth/start")]
+    [ProducesResponseType(typeof(TraktAuthStartResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<TraktAuthStartResponse>> StartTraktAuth(CancellationToken cancellationToken)
+    {
+        var result = await _traktService.StartDeviceAuthAsync(cancellationToken).ConfigureAwait(false);
+        if (result is null)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, "Failed to start Trakt auth. Check JELLYFIN_TRAKT_CLIENT_ID is set.");
+        }
+
+        return Ok(new TraktAuthStartResponse(result.UserCode, result.VerificationUrl, result.DeviceCode, result.Interval));
+    }
+
+    /// <summary>
+    /// Polls once to check if the user has completed Trakt activation.
+    /// </summary>
+    [HttpPost("trakt/auth/poll")]
+    [ProducesResponseType(typeof(TraktAuthPollResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TraktAuthPollResponse>> PollTraktAuth(
+        [FromBody] TraktAuthPollRequest request,
+        CancellationToken cancellationToken)
+    {
+        var authenticated = await _traktService.PollForTokenAsync(request.DeviceCode, cancellationToken).ConfigureAwait(false);
+        return Ok(new TraktAuthPollResponse(authenticated));
+    }
+
+    /// <summary>
+    /// Returns the user's recent Trakt watch history.
+    /// </summary>
+    [HttpGet("trakt/history")]
+    [ProducesResponseType(typeof(IReadOnlyList<TraktHistoryItem>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<TraktHistoryItem>>> GetTraktHistory(
+        [FromQuery] int limit = 5,
+        CancellationToken cancellationToken = default)
+    {
+        var history = await _traktService.GetHistoryAsync(limit, cancellationToken).ConfigureAwait(false);
+        return Ok(history);
+    }
+
+    /// <summary>
+    /// Returns whether the user is authenticated with Trakt.
+    /// </summary>
+    [HttpGet("trakt/status")]
+    [ProducesResponseType(typeof(TraktAuthPollResponse), StatusCodes.Status200OK)]
+    public ActionResult<TraktAuthPollResponse> GetTraktStatus()
+        => Ok(new TraktAuthPollResponse(_traktService.IsAuthenticated));
 }
 
 public record StreamRequest(string MagnetUrl);
 public record StreamResponse(string Url);
+public record TraktAuthStartResponse(string UserCode, string VerificationUrl, string DeviceCode, int Interval);
+public record TraktAuthPollRequest(string DeviceCode);
+public record TraktAuthPollResponse(bool Authenticated);

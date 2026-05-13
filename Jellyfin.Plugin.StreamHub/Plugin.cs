@@ -1,10 +1,10 @@
-using Jellyfin.Plugin.RealDebrid.Configuration;
+using Jellyfin.Plugin.StreamHub.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 
-namespace Jellyfin.Plugin.RealDebrid;
+namespace Jellyfin.Plugin.StreamHub;
 
 public class Plugin : BasePlugin<PluginConfiguration>
 {
@@ -18,9 +18,9 @@ public class Plugin : BasePlugin<PluginConfiguration>
 
     public override Guid Id => new Guid("d4f5a3b2-1c6e-4d8f-9a2b-7e3c5f1d0e4a");
 
-    public override string Name => "Real-Debrid";
+    public override string Name => "StreamHub";
 
-    public override string Description => "Stream media via Real-Debrid.";
+    public override string Description => "Search, stream and track media via Real-Debrid, Prowlarr and Trakt.";
 
     public string? GetApiKey() =>
         Environment.GetEnvironmentVariable("JELLYFIN_RD_API_KEY")
@@ -33,4 +33,19 @@ public class Plugin : BasePlugin<PluginConfiguration>
     public string? GetProwlarrApiKey() =>
         Environment.GetEnvironmentVariable("JELLYFIN_PROWLARR_API_KEY")
         ?? (string.IsNullOrEmpty(Configuration.ProwlarrApiKey) ? null : Configuration.ProwlarrApiKey);
+
+    public string? GetTraktClientId() =>
+        Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_ID")
+        ?? (string.IsNullOrEmpty(Configuration.TraktClientId) ? null : Configuration.TraktClientId);
+
+    public string? GetTraktClientSecret() =>
+        Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_SECRET")
+        ?? (string.IsNullOrEmpty(Configuration.TraktClientSecret) ? null : Configuration.TraktClientSecret);
+
+    public void SaveTraktTokens(string accessToken, string refreshToken)
+    {
+        Configuration.TraktAccessToken = accessToken;
+        Configuration.TraktRefreshToken = refreshToken;
+        SaveConfiguration();
+    }
 }

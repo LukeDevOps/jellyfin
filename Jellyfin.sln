@@ -99,7 +99,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Database.Implement
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.CodeAnalysis", "src\Jellyfin.CodeAnalysis\Jellyfin.CodeAnalysis.csproj", "{11643D0F-6761-4EF7-AB71-6F9F8DE00714}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.RealDebrid", "Jellyfin.Plugin.RealDebrid\Jellyfin.Plugin.RealDebrid.csproj", "{2D8179E7-AE0D-4BA1-8AD4-37F3B9094EE8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jellyfin.Plugin.StreamHub", "Jellyfin.Plugin.StreamHub\Jellyfin.Plugin.StreamHub.csproj", "{2D8179E7-AE0D-4BA1-8AD4-37F3B9094EE8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

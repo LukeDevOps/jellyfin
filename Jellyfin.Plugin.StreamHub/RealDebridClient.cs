@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.RealDebrid;
+namespace Jellyfin.Plugin.StreamHub;
 
 public class RealDebridClient
 {
