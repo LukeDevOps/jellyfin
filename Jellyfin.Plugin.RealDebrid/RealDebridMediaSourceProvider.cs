@@ -10,23 +10,50 @@ namespace Jellyfin.Plugin.RealDebrid;
 public class RealDebridMediaSourceProvider : IMediaSourceProvider
 {
     private readonly ILogger<RealDebridMediaSourceProvider> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public RealDebridMediaSourceProvider(ILogger<RealDebridMediaSourceProvider> logger)
+    public RealDebridMediaSourceProvider(ILogger<RealDebridMediaSourceProvider> logger, IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
-    public Task<IEnumerable<MediaSourceInfo>> GetMediaSources(BaseItem item, CancellationToken cancellationToken)
+    public async Task<IEnumerable<MediaSourceInfo>> GetMediaSources(BaseItem item, CancellationToken cancellationToken)
     {
         var apiKey = Plugin.Instance?.GetApiKey();
         if (string.IsNullOrEmpty(apiKey))
         {
             _logger.LogWarning("Real-Debrid API key is not configured. Set the JELLYFIN_RD_API_KEY environment variable.");
-            return Task.FromResult(Enumerable.Empty<MediaSourceInfo>());
+            return [];
         }
 
-        // TODO: call Real-Debrid /unrestrict/link with the item path and return a direct URL
-        return Task.FromResult(Enumerable.Empty<MediaSourceInfo>());
+        if (string.IsNullOrEmpty(item.Path))
+        {
+            return [];
+        }
+
+        var client = new RealDebridClient(_httpClientFactory.CreateClient(), apiKey);
+        var directUrl = await client.UnrestrictLinkAsync(item.Path, cancellationToken).ConfigureAwait(false);
+
+        if (string.IsNullOrEmpty(directUrl))
+        {
+            _logger.LogDebug("Real-Debrid did not return a download URL for {Path}", item.Path);
+            return [];
+        }
+
+        return
+        [
+            new MediaSourceInfo
+            {
+                Id = "realdebrid",
+                Name = "Real-Debrid",
+                Path = directUrl,
+                Protocol = MediaProtocol.Http,
+                IsRemote = true,
+                SupportsDirectPlay = true,
+                SupportsDirectStream = true
+            }
+        ];
     }
 
     public Task<ILiveStream> OpenMediaSource(string openToken, List<ILiveStream> currentLiveStreams, CancellationToken cancellationToken)
