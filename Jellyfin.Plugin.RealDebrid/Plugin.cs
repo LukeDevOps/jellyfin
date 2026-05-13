@@ -25,4 +25,12 @@ public class Plugin : BasePlugin<PluginConfiguration>
     public string? GetApiKey() =>
         Environment.GetEnvironmentVariable("JELLYFIN_RD_API_KEY")
         ?? (string.IsNullOrEmpty(Configuration.ApiKey) ? null : Configuration.ApiKey);
+
+    public string? GetProwlarrUrl() =>
+        Environment.GetEnvironmentVariable("JELLYFIN_PROWLARR_URL")
+        ?? (string.IsNullOrEmpty(Configuration.ProwlarrUrl) ? null : Configuration.ProwlarrUrl);
+
+    public string? GetProwlarrApiKey() =>
+        Environment.GetEnvironmentVariable("JELLYFIN_PROWLARR_API_KEY")
+        ?? (string.IsNullOrEmpty(Configuration.ProwlarrApiKey) ? null : Configuration.ProwlarrApiKey);
 }
