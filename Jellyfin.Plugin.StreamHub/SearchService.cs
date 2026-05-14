@@ -47,13 +47,43 @@ public class SearchService
         }
 
         var results = withHashes
-            .OrderByDescending(r => r.Seeders)
-            .Select(r => new DebridSearchResult(r.Title, r.InfoHash!, r.DownloadUrl ?? $"magnet:?xt=urn:btih:{r.InfoHash}", r.Size, r.Seeders, r.Indexer))
+            .OrderBy(r => ResolutionTier(r.Title))
+            .ThenBy(r => SourceTier(r.Title))
+            .ThenByDescending(r => r.Seeders)
+            .Select(r => new DebridSearchResult(r.Title, r.InfoHash!, r.DownloadUrl ?? $"magnet:?xt=urn:btih:{r.InfoHash}", r.Size, r.Seeders, r.Indexer, ResolutionLabel(r.Title)))
             .ToList();
 
         _logger.LogInformation("Found {Count} results for: {Query}", results.Count, query);
         return results;
     }
+
+    private static string ResolutionLabel(string title) => title.ToUpperInvariant() switch
+    {
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b(2160P|4K|UHD)\b") => "4K",
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b1080P\b") => "1080p",
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b720P\b") => "720p",
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b480P\b") => "480p",
+        _ => "SD"
+    };
+
+    private static int ResolutionTier(string title) => title.ToUpperInvariant() switch
+    {
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b(2160P|4K|UHD)\b") => 1,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b1080P\b") => 2,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b720P\b") => 3,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\b480P\b") => 4,
+        _ => 5
+    };
+
+    private static int SourceTier(string title) => title.ToUpperInvariant() switch
+    {
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\bBLU[-]?RAY\b|\bBDRIP\b|\bBDMV\b") => 1,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\bWEB[-]?DL\b") => 2,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\bWEB[-]?RIP\b") => 3,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\bHDTV\b") => 4,
+        var t when System.Text.RegularExpressions.Regex.IsMatch(t, @"\bDVDRIP\b|\bDVD\b") => 5,
+        _ => 6
+    };
 }
 
 public record DebridSearchResult(
@@ -62,4 +92,5 @@ public record DebridSearchResult(
     string MagnetUrl,
     long Size,
     int Seeders,
-    string Indexer);
+    string Indexer,
+    string Quality);
