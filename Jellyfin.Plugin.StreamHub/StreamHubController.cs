@@ -2,6 +2,7 @@ using Jellyfin.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.StreamHub;
 
@@ -13,12 +14,14 @@ public class StreamHubController : BaseJellyfinApiController
     private readonly SearchService _searchService;
     private readonly TraktService _traktService;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<StreamHubController> _logger;
 
-    public StreamHubController(SearchService searchService, TraktService traktService, IHttpClientFactory httpClientFactory)
+    public StreamHubController(SearchService searchService, TraktService traktService, IHttpClientFactory httpClientFactory, ILogger<StreamHubController> logger)
     {
         _searchService = searchService;
         _traktService = traktService;
         _httpClientFactory = httpClientFactory;
+        _logger = logger;
     }
 
     /// <summary>
@@ -60,10 +63,10 @@ public class StreamHubController : BaseJellyfinApiController
             return BadRequest("MagnetUrl is required.");
         }
 
-        var apiKey = Plugin.Instance?.GetApiKey();
+        var apiKey = Environment.GetEnvironmentVariable("JELLYFIN_RD_API_KEY");
         if (string.IsNullOrEmpty(apiKey))
         {
-            return StatusCode(StatusCodes.Status502BadGateway, "Real-Debrid is not configured.");
+            return StatusCode(StatusCodes.Status502BadGateway, "Real-Debrid is not configured. Set JELLYFIN_RD_API_KEY.");
         }
 
         var rd = new RealDebridClient(_httpClientFactory.CreateClient(), apiKey);
@@ -116,7 +119,9 @@ public class StreamHubController : BaseJellyfinApiController
         [FromBody] TraktAuthPollRequest request,
         CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Trakt poll: DeviceCode={DeviceCode}", string.IsNullOrEmpty(request.DeviceCode) ? "(empty)" : request.DeviceCode[..8] + "…");
         var authenticated = await _traktService.PollForTokenAsync(request.DeviceCode, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Trakt poll result: authenticated={Authenticated}", authenticated);
         return Ok(new TraktAuthPollResponse(authenticated));
     }
 
@@ -142,8 +147,8 @@ public class StreamHubController : BaseJellyfinApiController
         => Ok(new TraktAuthPollResponse(_traktService.IsAuthenticated));
 }
 
-public record StreamRequest(string MagnetUrl);
+public record StreamRequest([property: System.Text.Json.Serialization.JsonPropertyName("magnetUrl")] string MagnetUrl);
 public record StreamResponse(string Url);
 public record TraktAuthStartResponse(string UserCode, string VerificationUrl, string DeviceCode, int Interval);
-public record TraktAuthPollRequest(string DeviceCode);
+public record TraktAuthPollRequest([property: System.Text.Json.Serialization.JsonPropertyName("deviceCode")] string DeviceCode);
 public record TraktAuthPollResponse(bool Authenticated);

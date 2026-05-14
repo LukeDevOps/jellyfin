@@ -8,6 +8,7 @@ using Jellyfin.Database.Implementations;
 using Jellyfin.Drawing;
 using Jellyfin.Drawing.Skia;
 using Jellyfin.LiveTv;
+using Jellyfin.Plugin.StreamHub;
 using Jellyfin.Server.Implementations.Activity;
 using Jellyfin.Server.Implementations.Devices;
 using Jellyfin.Server.Implementations.Events;
@@ -108,6 +109,9 @@ namespace Jellyfin.Server
                 serviceCollection.AddSingleton(typeof(ILyricParser), type);
             }
 
+            serviceCollection.AddSingleton<Jellyfin.Plugin.StreamHub.SearchService>();
+            serviceCollection.AddSingleton<Jellyfin.Plugin.StreamHub.TraktService>();
+
             base.RegisterServices(serviceCollection);
         }
 
@@ -125,6 +129,9 @@ namespace Jellyfin.Server
 
             // Jellyfin.LiveTv
             yield return typeof(LiveTvManager).Assembly;
+
+            // Jellyfin.Plugin.StreamHub
+            yield return typeof(StreamHubController).Assembly;
         }
     }
 }

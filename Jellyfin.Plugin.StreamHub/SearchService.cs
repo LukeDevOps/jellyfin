@@ -13,17 +13,11 @@ public class SearchService
         _logger = logger;
     }
 
-    /// <summary>
-    /// Searches Prowlarr for the given query, checks Real-Debrid instant availability,
-    /// and returns stream-ready results ranked by seeders.
-    /// </summary>
     public async Task<IReadOnlyList<DebridSearchResult>> SearchAsync(string query, int category, CancellationToken cancellationToken)
     {
-        var plugin = Plugin.Instance;
-
-        var prowlarrUrl = plugin?.GetProwlarrUrl();
-        var prowlarrKey = plugin?.GetProwlarrApiKey();
-        var rdKey = plugin?.GetApiKey();
+        var prowlarrUrl = Environment.GetEnvironmentVariable("JELLYFIN_PROWLARR_URL");
+        var prowlarrKey = Environment.GetEnvironmentVariable("JELLYFIN_PROWLARR_API_KEY");
+        var rdKey = Environment.GetEnvironmentVariable("JELLYFIN_RD_API_KEY");
 
         if (string.IsNullOrEmpty(prowlarrUrl) || string.IsNullOrEmpty(prowlarrKey))
         {

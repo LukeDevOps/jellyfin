@@ -1,3 +1,5 @@
+using System.Text.Json;
+using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.StreamHub;
@@ -6,22 +8,22 @@ public class TraktService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<TraktService> _logger;
+    private readonly string _tokenPath;
 
-    public TraktService(IHttpClientFactory httpClientFactory, ILogger<TraktService> logger)
+    private record TokenStore(string AccessToken, string RefreshToken);
+
+    public TraktService(IHttpClientFactory httpClientFactory, IApplicationPaths appPaths, ILogger<TraktService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _tokenPath = Path.Combine(appPaths.DataPath, "streamhub-trakt.json");
     }
 
-    public bool IsAuthenticated =>
-        !string.IsNullOrEmpty(Plugin.Instance?.Configuration.TraktAccessToken);
+    public bool IsAuthenticated => !string.IsNullOrEmpty(LoadTokens()?.AccessToken);
 
-    /// <summary>
-    /// Kicks off the device code flow. Returns the code the user enters at trakt.tv/activate.
-    /// </summary>
     public async Task<DeviceCodeResponse?> StartDeviceAuthAsync(CancellationToken cancellationToken)
     {
-        var clientId = Plugin.Instance?.GetTraktClientId();
+        var clientId = Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_ID");
         if (string.IsNullOrEmpty(clientId))
         {
             _logger.LogWarning("Trakt client ID is not configured. Set JELLYFIN_TRAKT_CLIENT_ID.");
@@ -29,16 +31,21 @@ public class TraktService
         }
 
         var client = new TraktClient(_httpClientFactory.CreateClient(), clientId);
-        return await client.StartDeviceAuthAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await client.StartDeviceAuthAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to call Trakt device/code endpoint.");
+            return null;
+        }
     }
 
-    /// <summary>
-    /// Polls Trakt once for a token using the device code. Returns true if authenticated, false if still pending.
-    /// </summary>
     public async Task<bool> PollForTokenAsync(string deviceCode, CancellationToken cancellationToken)
     {
-        var clientId = Plugin.Instance?.GetTraktClientId();
-        var clientSecret = Plugin.Instance?.GetTraktClientSecret();
+        var clientId = Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_ID");
+        var clientSecret = Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_SECRET");
 
         if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
         {
@@ -48,6 +55,8 @@ public class TraktService
 
         var client = new TraktClient(_httpClientFactory.CreateClient(), clientId);
 
+        _logger.LogInformation("Trakt: polling /oauth/token with device_code={Code}, client_id={Id}", deviceCode, clientId[..8] + "…");
+
         try
         {
             var token = await client.PollForTokenAsync(deviceCode, clientSecret, cancellationToken).ConfigureAwait(false);
@@ -56,24 +65,26 @@ public class TraktService
                 return false;
             }
 
-            Plugin.Instance!.SaveTraktTokens(token.AccessToken, token.RefreshToken);
+            SaveTokens(token.AccessToken, token.RefreshToken);
             _logger.LogInformation("Trakt authentication successful.");
             return true;
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException ex) when (ex.Message.Contains("still pending", StringComparison.Ordinal))
+        {
+            _logger.LogInformation("Trakt poll response: {Message}", ex.Message);
+            return false;
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Trakt device auth polling failed.");
             return false;
         }
     }
 
-    /// <summary>
-    /// Returns the user's recent watch history from Trakt.
-    /// </summary>
     public async Task<IReadOnlyList<TraktHistoryItem>> GetHistoryAsync(int limit, CancellationToken cancellationToken)
     {
-        var accessToken = Plugin.Instance?.Configuration.TraktAccessToken;
-        var clientId = Plugin.Instance?.GetTraktClientId();
+        var clientId = Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_ID");
+        var accessToken = LoadTokens()?.AccessToken;
 
         if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(clientId))
         {
@@ -82,5 +93,25 @@ public class TraktService
 
         var client = new TraktClient(_httpClientFactory.CreateClient(), clientId);
         return await client.GetHistoryAsync(accessToken, limit, cancellationToken).ConfigureAwait(false);
+    }
+
+    private TokenStore? LoadTokens()
+    {
+        try
+        {
+            if (!File.Exists(_tokenPath)) return null;
+            var json = File.ReadAllText(_tokenPath);
+            return JsonSerializer.Deserialize<TokenStore>(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void SaveTokens(string accessToken, string refreshToken)
+    {
+        var json = JsonSerializer.Serialize(new TokenStore(accessToken, refreshToken));
+        File.WriteAllText(_tokenPath, json);
     }
 }

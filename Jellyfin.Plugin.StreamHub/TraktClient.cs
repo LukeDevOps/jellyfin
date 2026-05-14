@@ -24,6 +24,7 @@ public class TraktClient
         _httpClient.DefaultRequestHeaders.Add("trakt-api-key", clientId);
         _httpClient.DefaultRequestHeaders.Add("trakt-api-version", "2");
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-StreamHub/1.0");
     }
 
     /// <summary>
@@ -37,7 +38,8 @@ public class TraktClient
 
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException($"Trakt device/code returned {(int)response.StatusCode}: {errorBody}");
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -54,26 +56,26 @@ public class TraktClient
         {
             code = deviceCode,
             client_id = _clientId,
-            client_secret = clientSecret,
-            grant_type = "urn:ietf:params:oauth:grant-type:device_code"
+            client_secret = clientSecret
         });
 
         var content = new StringContent(body, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{BaseUrl}/oauth/token", content, cancellationToken).ConfigureAwait(false);
+        var response = await _httpClient.PostAsync($"{BaseUrl}/oauth/device/token", content, cancellationToken).ConfigureAwait(false);
+
+        var pollBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
         // 400 = still pending, 410 = expired
         if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
-            return null;
+            throw new InvalidOperationException($"Trakt /oauth/token 400 (still pending): {pollBody}");
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"Trakt device auth failed: {response.StatusCode}");
+            throw new InvalidOperationException($"Trakt /oauth/token {(int)response.StatusCode}: {pollBody}");
         }
 
-        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Deserialize<TokenResponse>(json, JsonOptions);
+        return JsonSerializer.Deserialize<TokenResponse>(pollBody, JsonOptions);
     }
 
     /// <summary>
