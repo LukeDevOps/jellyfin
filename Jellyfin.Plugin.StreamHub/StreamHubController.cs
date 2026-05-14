@@ -139,6 +139,21 @@ public class StreamHubController : BaseJellyfinApiController
     }
 
     /// <summary>
+    /// Returns personalised Trakt recommendations. type = "movies" or "shows".
+    /// </summary>
+    [HttpGet("trakt/recommendations")]
+    [ProducesResponseType(typeof(IReadOnlyList<TraktRecommendationItem>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<TraktRecommendationItem>>> GetTraktRecommendations(
+        [FromQuery] string type = "movies",
+        [FromQuery] int limit = 5,
+        [FromQuery] int page = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var items = await _traktService.GetRecommendationsAsync(type, limit, page, cancellationToken).ConfigureAwait(false);
+        return Ok(items);
+    }
+
+    /// <summary>
     /// Returns whether the user is authenticated with Trakt.
     /// </summary>
     [HttpGet("trakt/status")]

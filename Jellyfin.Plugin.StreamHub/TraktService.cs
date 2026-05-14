@@ -95,6 +95,20 @@ public class TraktService
         return await client.GetHistoryAsync(accessToken, limit, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<TraktRecommendationItem>> GetRecommendationsAsync(string type, int limit, int page, CancellationToken cancellationToken)
+    {
+        var clientId = Environment.GetEnvironmentVariable("JELLYFIN_TRAKT_CLIENT_ID");
+        var accessToken = LoadTokens()?.AccessToken;
+
+        if (string.IsNullOrEmpty(accessToken) || string.IsNullOrEmpty(clientId))
+        {
+            return [];
+        }
+
+        var client = new TraktClient(_httpClientFactory.CreateClient(), clientId);
+        return await client.GetRecommendationsAsync(type, accessToken, limit, page, cancellationToken).ConfigureAwait(false);
+    }
+
     private TokenStore? LoadTokens()
     {
         try

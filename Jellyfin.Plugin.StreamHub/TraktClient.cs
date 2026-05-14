@@ -95,6 +95,24 @@ public class TraktClient
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Deserialize<List<TraktHistoryItem>>(json, JsonOptions) ?? [];
     }
+
+    /// <summary>
+    /// Gets personalised recommendations. type is "movies" or "shows".
+    /// </summary>
+    public async Task<IReadOnlyList<TraktRecommendationItem>> GetRecommendationsAsync(string type, string accessToken, int limit, int page, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/recommendations/{type}?limit={limit}&page={page}&extended=full");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Deserialize<List<TraktRecommendationItem>>(json, JsonOptions) ?? [];
+    }
 }
 
 public class DeviceCodeResponse
@@ -179,6 +197,18 @@ public class TraktEpisode
 
     [JsonPropertyName("title")]
     public string Title { get; set; } = string.Empty;
+}
+
+public class TraktRecommendationItem
+{
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [JsonPropertyName("year")]
+    public int Year { get; set; }
+
+    [JsonPropertyName("ids")]
+    public TraktIds Ids { get; set; } = new();
 }
 
 public class TraktIds
