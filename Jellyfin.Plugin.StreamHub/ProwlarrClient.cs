@@ -22,12 +22,13 @@ public class ProwlarrClient
     {
         _httpClient = httpClient;
         _baseUrl = baseUrl.TrimEnd('/');
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
         _httpClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
     }
 
     public async Task<IReadOnlyList<ProwlarrResult>> SearchAsync(string query, int category, CancellationToken cancellationToken)
     {
-        var url = $"{_baseUrl}/api/v1/search?query={Uri.EscapeDataString(query)}&indexerIds=-1&categories={category}&type=search";
+        var url = $"{_baseUrl}/api/v1/search?query={Uri.EscapeDataString(query)}&categories={category}&type=search";
         var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)

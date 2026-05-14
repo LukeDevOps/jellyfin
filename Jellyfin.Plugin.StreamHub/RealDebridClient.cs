@@ -37,42 +37,6 @@ public class RealDebridClient
     }
 
     /// <summary>
-    /// Checks which of the supplied hashes are instantly available (already cached) on Real-Debrid.
-    /// Returns the subset of hashes that are cached.
-    /// </summary>
-    public async Task<IReadOnlySet<string>> GetInstantAvailabilityAsync(IEnumerable<string> hashes, CancellationToken cancellationToken)
-    {
-        var hashList = string.Join("/", hashes.Select(h => h.ToUpperInvariant()));
-        if (string.IsNullOrEmpty(hashList))
-        {
-            return new HashSet<string>();
-        }
-
-        var response = await _httpClient.GetAsync($"{BaseUrl}/torrents/instantAvailability/{hashList}", cancellationToken).ConfigureAwait(false);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return new HashSet<string>();
-        }
-
-        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-        // Response is a dict keyed by uppercase hash — if a hash has cached variants its value is non-empty
-        using var doc = JsonDocument.Parse(json);
-        var cached = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var prop in doc.RootElement.EnumerateObject())
-        {
-            // Each value is an object with a "rd" array — non-empty means it's cached
-            if (prop.Value.TryGetProperty("rd", out var rd) && rd.GetArrayLength() > 0)
-            {
-                cached.Add(prop.Name);
-            }
-        }
-
-        return cached;
-    }
-
-    /// <summary>
     /// Adds a magnet link to Real-Debrid and returns the torrent ID.
     /// </summary>
     public async Task<string?> AddMagnetAsync(string magnetUrl, CancellationToken cancellationToken)

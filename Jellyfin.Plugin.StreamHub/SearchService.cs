@@ -32,7 +32,6 @@ public class SearchService
         }
 
         var prowlarr = new ProwlarrClient(_httpClientFactory.CreateClient(), prowlarrUrl, prowlarrKey);
-        var rd = new RealDebridClient(_httpClientFactory.CreateClient(), rdKey);
 
         _logger.LogInformation("Searching Prowlarr for: {Query}", query);
         var prowlarrResults = await prowlarr.SearchAsync(query, category, cancellationToken).ConfigureAwait(false);
@@ -47,19 +46,13 @@ public class SearchService
             return [];
         }
 
-        _logger.LogInformation("Checking RD instant availability for {Count} results", withHashes.Count);
-        var cachedHashes = await rd.GetInstantAvailabilityAsync(
-            withHashes.Select(r => r.InfoHash!),
-            cancellationToken).ConfigureAwait(false);
-
-        var cached = withHashes
-            .Where(r => cachedHashes.Contains(r.InfoHash!))
+        var results = withHashes
             .OrderByDescending(r => r.Seeders)
             .Select(r => new DebridSearchResult(r.Title, r.InfoHash!, r.DownloadUrl ?? $"magnet:?xt=urn:btih:{r.InfoHash}", r.Size, r.Seeders, r.Indexer))
             .ToList();
 
-        _logger.LogInformation("Found {Count} RD-cached results for: {Query}", cached.Count, query);
-        return cached;
+        _logger.LogInformation("Found {Count} results for: {Query}", results.Count, query);
+        return results;
     }
 }
 
